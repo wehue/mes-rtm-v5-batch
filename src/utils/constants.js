@@ -1,11 +1,9 @@
 export const ROLES = [
-  { value: 'process_engineer', label: '工艺工程师', username: 'process', password: '123456' },
-  { value: 'operator', label: '操作工', username: 'operator', password: '123456' },
-  { value: 'team_leader', label: '班组长', username: 'leader', password: '123456' },
-  { value: 'production_manager', label: '生产经理', username: 'manager', password: '123456' },
-  { value: 'quality_engineer', label: '质量工程师', username: 'quality', password: '123456' },
-  { value: 'repairman', label: '维修工', username: 'repair', password: '123456' },
-  { value: 'admin', label: '管理员', username: 'admin', password: '123456' },
+  { value: 'production_manager', label: '生产主管' },
+  { value: 'team_leader', label: '班组长' },
+  { value: 'operator', label: '操作工' },
+  { value: 'quality_engineer', label: '质量工程师' },
+  { value: 'admin', label: '工厂管理层' },
 ]
 
 export const PERMISSION_CODES = {
@@ -55,68 +53,6 @@ export const BACKEND_FUNCTION_PERMISSION_MAP = {
   PARAM_CONSISTENCY_CHECK: [PERMISSION_CODES.DEVICE],
 }
 
-export const ROLE_PERMISSIONS = {
-  process_engineer: [
-    PERMISSION_CODES.DASHBOARD,
-    PERMISSION_CODES.KANBAN,
-    PERMISSION_CODES.DEVICE,
-    PERMISSION_CODES.SYSTEM,
-  ],
-  production_manager: [
-    PERMISSION_CODES.DASHBOARD,
-    PERMISSION_CODES.KANBAN,
-    PERMISSION_CODES.WORK_ORDER,
-    PERMISSION_CODES.BATCH,
-    PERMISSION_CODES.TRACKING,
-    PERMISSION_CODES.SYSTEM,
-  ],
-  team_leader: [
-    PERMISSION_CODES.DASHBOARD,
-    PERMISSION_CODES.KANBAN,
-    PERMISSION_CODES.LOADING,
-    PERMISSION_CODES.CHECK_IN,
-    PERMISSION_CODES.CHECK_OUT,
-    PERMISSION_CODES.TRACKING,
-    PERMISSION_CODES.SYSTEM,
-  ],
-  operator: [
-    PERMISSION_CODES.DASHBOARD,
-    PERMISSION_CODES.KANBAN,
-    PERMISSION_CODES.LOADING,
-    PERMISSION_CODES.CHECK_IN,
-    PERMISSION_CODES.CHECK_OUT,
-    PERMISSION_CODES.TRACKING,
-    PERMISSION_CODES.SYSTEM,
-  ],
-  quality_engineer: [
-    PERMISSION_CODES.DASHBOARD,
-    PERMISSION_CODES.KANBAN,
-    PERMISSION_CODES.BATCH,
-    PERMISSION_CODES.CHECK_OUT,
-    PERMISSION_CODES.REPAIR,
-    PERMISSION_CODES.TRACKING,
-    PERMISSION_CODES.SYSTEM,
-  ],
-  repairman: [
-    PERMISSION_CODES.DASHBOARD,
-    PERMISSION_CODES.KANBAN,
-    PERMISSION_CODES.REPAIR,
-    PERMISSION_CODES.TRACKING,
-    PERMISSION_CODES.SYSTEM,
-  ],
-  admin: Object.values(PERMISSION_CODES),
-}
-
-export const ROLE_HOME_PATH = {
-  process_engineer: '/device',
-  production_manager: '/production/work-order',
-  team_leader: '/execution/loading',
-  operator: '/execution/loading',
-  quality_engineer: '/execution/repair',
-  repairman: '/execution/repair',
-  admin: '/dashboard',
-}
-
 export const PERMISSION_HOME_PATH = [
   { permission: PERMISSION_CODES.DASHBOARD, path: '/dashboard' },
   { permission: PERMISSION_CODES.WORK_ORDER, path: '/production/work-order' },
@@ -140,7 +76,7 @@ export function normalizeFunctionList(payload) {
 export function functionListToPermissionCodes(functions = []) {
   const codes = new Set()
   normalizeFunctionList(functions).forEach((item) => {
-    const rawCode = item?.functionCode || item?.FunctionCode || item?.code || item
+    const rawCode = item?.functionCode || item?.FunctionCode || item
     const functionCode = typeof rawCode === 'string' ? rawCode.trim() : rawCode
     const normalizedCode = typeof functionCode === 'string' ? functionCode.replace(/-/g, '_').toLowerCase() : functionCode
     const upperCode = typeof functionCode === 'string' ? functionCode.toUpperCase() : functionCode
@@ -165,19 +101,6 @@ export function firstAccessiblePathByPermissions(permissionCodes = []) {
 
 export function isRtmRole(role) {
   return ROLES.some((item) => item.value === role)
-}
-
-export function roleHasPermission(role, permission) {
-  if (!permission || role === 'admin') return true
-  return ROLE_PERMISSIONS[role]?.includes(permission) || false
-}
-
-export function firstAccessiblePath(role) {
-  return ROLE_HOME_PATH[role] || '/dashboard'
-}
-
-export function findLoginRole(username, password) {
-  return ROLES.find((item) => item.username === username && item.password === password) || null
 }
 
 export const WORK_ORDER_STATUS = {

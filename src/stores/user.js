@@ -2,12 +2,9 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { getCurrentUserFunctions } from '@/api/user'
 import {
-  findLoginRole,
-  firstAccessiblePath,
   firstAccessiblePathByPermissions,
   functionListToPermissionCodes,
   hasBackendPermission,
-  roleHasPermission,
 } from '@/utils/constants'
 
 const DEFAULT_LINES = ['SMT-A1', 'SMT-A2', 'SMT-B1', 'SMT-B2']
@@ -25,6 +22,7 @@ const POSITION_ROLE_MAP = {
 
 const ROLE_CODE_MAP = {
   PRODUCTION_SUPERVISOR: 'production_manager',
+  PRODUCTION_MANAGER: 'production_manager',
   LEADER: 'team_leader',
   TEAM_LEADER: 'team_leader',
   OPERATOR: 'operator',
@@ -38,11 +36,11 @@ const DEFAULT_USER = {
   id: 'U001',
   userId: 'U001',
   username: 'admin',
-  name: 'Administrator',
-  fullName: 'Administrator',
-  department: 'Production',
-  post: 'Administrator',
-  position: 'Administrator',
+  name: '工厂管理层',
+  fullName: '工厂管理层',
+  department: '生产部',
+  post: '管理层',
+  position: '管理层',
   role: 'admin',
   roles: ['admin'],
   lines: DEFAULT_LINES,
@@ -125,33 +123,6 @@ export const useUserStore = defineStore('user', () => {
     return fetchCurrentFunctions()
   }
 
-  function login(username, password) {
-    const role = findLoginRole(username, password)
-    if (!role) {
-      return { ok: false, message: 'Invalid username or password' }
-    }
-
-    const info = {
-      id: role.value,
-      username: role.username,
-      name: role.label,
-      role: role.value,
-      roles: [role.value],
-      department: 'Production',
-    }
-
-    token.value = `token-${role.value}`
-    userInfo.value = normalizeUserInfo(info)
-    permissionCodes.value = []
-    permissionsLoaded.value = false
-    localStorage.setItem('token', token.value)
-    localStorage.setItem('userInfo', JSON.stringify(userInfo.value))
-    localStorage.setItem('isLoggedIn', 'true')
-    localStorage.setItem('username', role.username)
-
-    return { ok: true, redirect: firstAccessiblePath(role.value) }
-  }
-
   function logout() {
     token.value = ''
     userInfo.value = DEFAULT_USER
@@ -175,17 +146,11 @@ export const useUserStore = defineStore('user', () => {
   }
 
   function hasPermission(permission) {
-    if (permissionCodes.value.length) {
-      return hasBackendPermission(permissionCodes.value, permission)
-    }
-    return roleHasPermission(userInfo.value?.role, permission)
+    return hasBackendPermission(permissionCodes.value, permission)
   }
 
-  function firstAccessiblePathForUser() {
-    if (permissionCodes.value.length) {
-      return firstAccessiblePathByPermissions(permissionCodes.value)
-    }
-    return firstAccessiblePath(userInfo.value?.role)
+  function firstAccessiblePath() {
+    return firstAccessiblePathByPermissions(permissionCodes.value)
   }
 
   return {
@@ -200,11 +165,10 @@ export const useUserStore = defineStore('user', () => {
     setFunctions,
     fetchCurrentFunctions,
     ensurePermissionsLoaded,
-    login,
     logout,
     hasRole,
     hasAnyRole,
     hasPermission,
-    firstAccessiblePath: firstAccessiblePathForUser,
+    firstAccessiblePath,
   }
 })
