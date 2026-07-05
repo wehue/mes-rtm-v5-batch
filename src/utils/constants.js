@@ -1,11 +1,11 @@
 export const ROLES = [
-  { value: 'process_engineer', label: '宸ヨ壓宸ョ▼甯?, username: 'process', password: '123456' },
-  { value: 'operator', label: '鎿嶄綔宸?, username: 'operator', password: '123456' },
-  { value: 'team_leader', label: '鐝粍闀?, username: 'leader', password: '123456' },
-  { value: 'production_manager', label: '鐢熶骇涓荤', username: 'manager', password: '123456' },
-  { value: 'quality_engineer', label: '璐ㄩ噺宸ョ▼甯?, username: 'quality', password: '123456' },
-  { value: 'repairman', label: '缁翠慨鍛?, username: 'repair', password: '123456' },
-  { value: 'admin', label: '宸ュ巶绠＄悊灞?, username: 'admin', password: '123456' },
+  { value: 'process_engineer', label: '工艺工程师', username: 'process', password: '123456' },
+  { value: 'operator', label: '操作工', username: 'operator', password: '123456' },
+  { value: 'team_leader', label: '班组长', username: 'leader', password: '123456' },
+  { value: 'production_manager', label: '生产经理', username: 'manager', password: '123456' },
+  { value: 'quality_engineer', label: '质量工程师', username: 'quality', password: '123456' },
+  { value: 'repairman', label: '维修工', username: 'repair', password: '123456' },
+  { value: 'admin', label: '管理员', username: 'admin', password: '123456' },
 ]
 
 export const PERMISSION_CODES = {
@@ -21,7 +21,6 @@ export const PERMISSION_CODES = {
   DEVICE: 'device',
   SYSTEM: 'system',
 }
-
 
 export const BACKEND_FUNCTION_PERMISSION_MAP = {
   dashboard: [PERMISSION_CODES.DASHBOARD],
@@ -56,55 +55,6 @@ export const BACKEND_FUNCTION_PERMISSION_MAP = {
   PARAM_CONSISTENCY_CHECK: [PERMISSION_CODES.DEVICE],
 }
 
-export const PERMISSION_HOME_PATH = [
-  { permission: PERMISSION_CODES.DASHBOARD, path: '/dashboard' },
-  { permission: PERMISSION_CODES.WORK_ORDER, path: '/production/work-order' },
-  { permission: PERMISSION_CODES.BATCH, path: '/production/batch' },
-  { permission: PERMISSION_CODES.LOADING, path: '/execution/loading' },
-  { permission: PERMISSION_CODES.CHECK_IN, path: '/execution/check-in' },
-  { permission: PERMISSION_CODES.CHECK_OUT, path: '/execution/check-out' },
-  { permission: PERMISSION_CODES.REPAIR, path: '/execution/repair' },
-  { permission: PERMISSION_CODES.TRACKING, path: '/execution/tracking' },
-  { permission: PERMISSION_CODES.DEVICE, path: '/device' },
-  { permission: PERMISSION_CODES.KANBAN, path: '/kanban/line-status' },
-]
-
-export function normalizeFunctionList(payload) {
-  if (Array.isArray(payload)) return payload
-  if (Array.isArray(payload?.list)) return payload.list
-  if (Array.isArray(payload?.records)) return payload.records
-  return []
-}
-
-export function functionListToPermissionCodes(functions = []) {
-  const codes = new Set()
-  normalizeFunctionList(functions).forEach((item) => {
-    const rawCode = item?.functionCode || item?.FunctionCode || item
-    const functionCode = typeof rawCode === 'string' ? rawCode.trim() : rawCode
-    const normalizedCode = typeof functionCode === 'string' ? functionCode.replace(/-/g, '_').toLowerCase() : functionCode
-    const upperCode = typeof functionCode === 'string' ? functionCode.toUpperCase() : functionCode
-    const permissions = BACKEND_FUNCTION_PERMISSION_MAP[functionCode]
-      || BACKEND_FUNCTION_PERMISSION_MAP[normalizedCode]
-      || BACKEND_FUNCTION_PERMISSION_MAP[upperCode]
-      || []
-    permissions.forEach((permission) => codes.add(permission))
-  })
-  codes.add(PERMISSION_CODES.SYSTEM)
-  return [...codes]
-}
-
-export function hasBackendPermission(permissionCodes = [], permission) {
-  if (!permission || permission === PERMISSION_CODES.SYSTEM) return true
-  return permissionCodes.includes(permission)
-}
-
-export function firstAccessiblePathByPermissions(permissionCodes = []) {
-  return PERMISSION_HOME_PATH.find((item) => hasBackendPermission(permissionCodes, item.permission))?.path || '/system/profile'
-}
-
-export function isRtmRole(role) {
-  return ROLES.some((item) => item.value === role)
-}
 export const ROLE_PERMISSIONS = {
   process_engineer: [
     PERMISSION_CODES.DASHBOARD,
@@ -167,6 +117,56 @@ export const ROLE_HOME_PATH = {
   admin: '/dashboard',
 }
 
+export const PERMISSION_HOME_PATH = [
+  { permission: PERMISSION_CODES.DASHBOARD, path: '/dashboard' },
+  { permission: PERMISSION_CODES.WORK_ORDER, path: '/production/work-order' },
+  { permission: PERMISSION_CODES.BATCH, path: '/production/batch' },
+  { permission: PERMISSION_CODES.LOADING, path: '/execution/loading' },
+  { permission: PERMISSION_CODES.CHECK_IN, path: '/execution/check-in' },
+  { permission: PERMISSION_CODES.CHECK_OUT, path: '/execution/check-out' },
+  { permission: PERMISSION_CODES.REPAIR, path: '/execution/repair' },
+  { permission: PERMISSION_CODES.TRACKING, path: '/execution/tracking' },
+  { permission: PERMISSION_CODES.DEVICE, path: '/device' },
+  { permission: PERMISSION_CODES.KANBAN, path: '/kanban/line-status' },
+]
+
+export function normalizeFunctionList(payload) {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.list)) return payload.list
+  if (Array.isArray(payload?.records)) return payload.records
+  return []
+}
+
+export function functionListToPermissionCodes(functions = []) {
+  const codes = new Set()
+  normalizeFunctionList(functions).forEach((item) => {
+    const rawCode = item?.functionCode || item?.FunctionCode || item?.code || item
+    const functionCode = typeof rawCode === 'string' ? rawCode.trim() : rawCode
+    const normalizedCode = typeof functionCode === 'string' ? functionCode.replace(/-/g, '_').toLowerCase() : functionCode
+    const upperCode = typeof functionCode === 'string' ? functionCode.toUpperCase() : functionCode
+    const permissions = BACKEND_FUNCTION_PERMISSION_MAP[functionCode]
+      || BACKEND_FUNCTION_PERMISSION_MAP[normalizedCode]
+      || BACKEND_FUNCTION_PERMISSION_MAP[upperCode]
+      || []
+    permissions.forEach((permission) => codes.add(permission))
+  })
+  codes.add(PERMISSION_CODES.SYSTEM)
+  return [...codes]
+}
+
+export function hasBackendPermission(permissionCodes = [], permission) {
+  if (!permission || permission === PERMISSION_CODES.SYSTEM) return true
+  return permissionCodes.includes(permission)
+}
+
+export function firstAccessiblePathByPermissions(permissionCodes = []) {
+  return PERMISSION_HOME_PATH.find((item) => hasBackendPermission(permissionCodes, item.permission))?.path || '/system/profile'
+}
+
+export function isRtmRole(role) {
+  return ROLES.some((item) => item.value === role)
+}
+
 export function roleHasPermission(role, permission) {
   if (!permission || role === 'admin') return true
   return ROLE_PERMISSIONS[role]?.includes(permission) || false
@@ -176,77 +176,78 @@ export function firstAccessiblePath(role) {
   return ROLE_HOME_PATH[role] || '/dashboard'
 }
 
+export function findLoginRole(username, password) {
+  return ROLES.find((item) => item.username === username && item.password === password) || null
+}
+
 export const WORK_ORDER_STATUS = {
-  1: { label: '鑽夌', type: 'info', color: '#909399' },
-  2: { label: '宸查噴鏀?, type: 'warning', color: '#d97706' },
-  3: { label: '鐢熶骇涓?, type: 'primary', color: '#2563eb' },
-  4: { label: '宸叉殏鍋?, type: 'warning', color: '#d97706' },
-  5: { label: '宸插畬鎴?, type: 'success', color: '#16a34a' },
-  6: { label: '宸插叧闂?, type: 'info', color: '#6b7280' },
-  draft: { label: '寰呭垱寤?, type: 'info', color: '#909399' },
-  pending: { label: '寰呴噴鏀?, type: 'warning', color: '#d97706' },
-  running: { label: '鐢熶骇涓?, type: 'primary', color: '#2563eb' },
-  paused: { label: '鏆傚仠', type: 'warning', color: '#d97706' },
-  completed: { label: '宸插畬鎴?, type: 'success', color: '#16a34a' },
-  closed: { label: '宸插叧闂?, type: 'info', color: '#6b7280' },
+  1: { label: '草稿', type: 'info', color: '#909399' },
+  2: { label: '已发布', type: 'warning', color: '#d97706' },
+  3: { label: '生产中', type: 'primary', color: '#2563eb' },
+  4: { label: '已暂停', type: 'warning', color: '#d97706' },
+  5: { label: '已完成', type: 'success', color: '#16a34a' },
+  6: { label: '已关闭', type: 'info', color: '#6b7280' },
+  draft: { label: '草稿', type: 'info', color: '#909399' },
+  pending: { label: '待发布', type: 'warning', color: '#d97706' },
+  running: { label: '生产中', type: 'primary', color: '#2563eb' },
+  paused: { label: '已暂停', type: 'warning', color: '#d97706' },
+  completed: { label: '已完成', type: 'success', color: '#16a34a' },
+  closed: { label: '已关闭', type: 'info', color: '#6b7280' },
 }
 
 export const BATCH_STATUS = {
-  1: { label: '寰呯敓浜?, type: 'warning', color: '#b7791f' },
-  2: { label: '鐢熶骇涓?, type: 'primary', color: '#2563eb' },
-  3: { label: '鏆傚仠', type: 'warning', color: '#d97706' },
-  4: { label: '缁翠慨涓?, type: 'danger', color: '#dc2626' },
-  5: { label: '宸查攣瀹?, type: 'danger', color: '#dc2626' },
-  6: { label: '宸插畬鎴?, type: 'success', color: '#16a34a' },
-  pending: { label: '寰呯敓浜?, type: 'warning', color: '#b7791f' },
-  running: { label: '鐢熶骇涓?, type: 'primary', color: '#2563eb' },
-  paused: { label: '鏆傚仠', type: 'warning', color: '#d97706' },
-  repair: { label: '缁翠慨涓?, type: 'danger', color: '#dc2626' },
-  locked: { label: '宸查攣瀹?, type: 'danger', color: '#dc2626' },
-  completed: { label: '宸插畬鎴?, type: 'success', color: '#16a34a' },
+  1: { label: '待生产', type: 'warning', color: '#b7791f' },
+  2: { label: '生产中', type: 'primary', color: '#2563eb' },
+  3: { label: '已暂停', type: 'warning', color: '#d97706' },
+  4: { label: '维修中', type: 'danger', color: '#dc2626' },
+  5: { label: '已锁定', type: 'danger', color: '#dc2626' },
+  6: { label: '已完成', type: 'success', color: '#16a34a' },
+  pending: { label: '待生产', type: 'warning', color: '#b7791f' },
+  running: { label: '生产中', type: 'primary', color: '#2563eb' },
+  paused: { label: '已暂停', type: 'warning', color: '#d97706' },
+  repair: { label: '维修中', type: 'danger', color: '#dc2626' },
+  locked: { label: '已锁定', type: 'danger', color: '#dc2626' },
+  completed: { label: '已完成', type: 'success', color: '#16a34a' },
 }
 
 export const PROCESS_STATUS = {
-  1: { label: '寰呰繘绔?, type: 'info', color: '#64748b' },
-  2: { label: '宸茶繘绔?, type: 'primary', color: '#2563eb' },
-  3: { label: '宸插嚭绔?, type: 'success', color: '#16a34a' },
-  4: { label: '鏆傚仠', type: 'warning', color: '#d97706' },
-  5: { label: '閿佸畾', type: 'danger', color: '#dc2626' },
-  6: { label: '璺宠繃', type: 'info', color: '#6b7280' },
-  wait_in: { label: '寰呰繘绔?, type: 'info', color: '#64748b' },
-  checked_in: { label: '宸茶繘绔?, type: 'primary', color: '#2563eb' },
-  checked_out: { label: '宸插嚭绔?, type: 'success', color: '#16a34a' },
-  paused: { label: '鏆傚仠', type: 'warning', color: '#d97706' },
-  locked: { label: '閿佸畾', type: 'danger', color: '#dc2626' },
-  skipped: { label: '璺宠繃', type: 'info', color: '#6b7280' },
+  1: { label: '待进站', type: 'info', color: '#64748b' },
+  2: { label: '已进站', type: 'primary', color: '#2563eb' },
+  3: { label: '已出站', type: 'success', color: '#16a34a' },
+  4: { label: '已暂停', type: 'warning', color: '#d97706' },
+  5: { label: '已锁定', type: 'danger', color: '#dc2626' },
+  6: { label: '已跳过', type: 'info', color: '#6b7280' },
+  wait_in: { label: '待进站', type: 'info', color: '#64748b' },
+  checked_in: { label: '已进站', type: 'primary', color: '#2563eb' },
+  checked_out: { label: '已出站', type: 'success', color: '#16a34a' },
+  paused: { label: '已暂停', type: 'warning', color: '#d97706' },
+  locked: { label: '已锁定', type: 'danger', color: '#dc2626' },
+  skipped: { label: '已跳过', type: 'info', color: '#6b7280' },
 }
 
 export const DEVICE_STATUS = {
-  1: { label: '杩愯', type: 'success', color: '#16a34a' },
-  2: { label: '寰呮満', type: 'warning', color: '#d97706' },
-  3: { label: '鏁呴殰', type: 'danger', color: '#dc2626' },
-  4: { label: '淇濆吇', type: 'warning', color: '#d97706' },
-  5: { label: '绂荤嚎', type: 'info', color: '#6b7280' },
-  6: { label: '鎶ュ簾', type: 'danger', color: '#dc2626' },
-  running: { label: '杩愯', type: 'success', color: '#16a34a' },
-  standby: { label: '寰呮満', type: 'warning', color: '#d97706' },
-  fault: { label: '鏁呴殰', type: 'danger', color: '#dc2626' },
-  offline: { label: '绂荤嚎', type: 'info', color: '#6b7280' },
+  1: { label: '运行中', type: 'success', color: '#16a34a' },
+  2: { label: '待机', type: 'warning', color: '#d97706' },
+  3: { label: '故障', type: 'danger', color: '#dc2626' },
+  4: { label: '维护中', type: 'warning', color: '#d97706' },
+  5: { label: '离线', type: 'info', color: '#6b7280' },
+  6: { label: '报废', type: 'danger', color: '#dc2626' },
+  running: { label: '运行中', type: 'success', color: '#16a34a' },
+  standby: { label: '待机', type: 'warning', color: '#d97706' },
+  fault: { label: '故障', type: 'danger', color: '#dc2626' },
+  maintenance: { label: '维护中', type: 'warning', color: '#d97706' },
+  offline: { label: '离线', type: 'info', color: '#6b7280' },
+  scrapped: { label: '报废', type: 'danger', color: '#dc2626' },
 }
 
 export const DEVICE_TYPES = [
-  '鍗板埛鏈?,
-  'SPI 妫€娴嬩华',
-  '楂橀€熻创鐗囨満',
-  '閫氱敤璐寸墖鏈?,
-  '鍥炴祦鐐?,
-  'AOI 妫€娴嬩华',
+  '印刷机',
+  'SPI检测仪',
+  '贴片机',
+  '回流焊',
+  'AOI检测仪',
 ]
 
 export function statusMeta(map, value) {
-  return map[value] || { label: value || '鏈煡', type: 'info', color: '#909399' }
-}
-
-export function findLoginRole(username, password) {
-  return ROLES.find((item) => item.username === username && item.password === password) || null
+  return map[value] || { label: value || '未知', type: 'info', color: '#909399' }
 }
