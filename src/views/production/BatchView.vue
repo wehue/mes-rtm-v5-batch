@@ -39,6 +39,7 @@ const createForm = reactive({
   OwnerId: 3,
 })
 const batchLineSelections = ref([])
+const batchQuantities = ref([])
 const statusStats = ref({
   pendingCount: 0,
   inProductionCount: 0,
@@ -194,15 +195,25 @@ const selectedFirstStep = computed(() => selectedRoute.value ? '投产后生成�
 const generatedBatchRows = computed(() => {
   const count = Math.max(Number(createForm.BatchCount) || 1, 1)
   if (!selectedWorkOrder.value || !workOrderDetail.value.plannedQuantity) return []
-  const totalQty = workOrderDetail.value.plannedQuantity
-  const baseQty = Math.floor(totalQty / count)
-  const remainder = totalQty % count
   return Array.from({ length: count }, (_, index) => ({
     Index: index + 1,
-    PlannedQuantity: baseQty + (index < remainder ? 1 : 0),
+    PlannedQuantity: Math.max(0, Number(batchQuantities.value[index]) || 0),
     LineCode: batchLineSelections.value[index] || batchLineOptions.value[0],
   }))
 })
+
+const allocatedTotal = computed(() => generatedBatchRows.value.reduce((sum, item) => sum + item.PlannedQuantity, 0))
+const allocationOverLimit = computed(() => allocatedTotal.value > remainingQty.value)
+const allocationIncomplete = computed(() => allocatedTotal.value < remainingQty.value)
+
+// 按当前工单计划数量与批次数自动平均分配（余数依次加到前若干个批次）
+function autoDistributeQuantities() {
+  const count = Math.max(Number(createForm.BatchCount) || 1, 1)
+  const totalQty = Number(workOrderDetail.value.plannedQuantity) || 0
+  const baseQty = Math.floor(totalQty / count)
+  const remainder = totalQty % count
+  batchQuantities.value = Array.from({ length: count }, (_, index) => baseQty + (index < remainder ? 1 : 0))
+}
 
 watch(
   () => createForm.WorkOrderId,
@@ -211,6 +222,7 @@ watch(
     const count = Math.max(Number(createForm.BatchCount) || 1, 1)
     const defaultLine = batchLineOptions.value[0]
     batchLineSelections.value = Array.from({ length: count }, (_, index) => batchLineSelections.value[index] || defaultLine)
+    autoDistributeQuantities()
   },
   { immediate: true }
 )
@@ -221,6 +233,15 @@ watch(
     const count = Math.max(Number(createForm.BatchCount) || 1, 1)
     const defaultLine = batchLineOptions.value[0]
     batchLineSelections.value = Array.from({ length: count }, (_, index) => batchLineSelections.value[index] || defaultLine)
+    // 批次数变化时，保留已编辑的数量；新增批次给 0 默认值
+    if (batchQuantities.value.length < count) {
+      batchQuantities.value = [
+        ...batchQuantities.value,
+        ...Array.from({ length: count - batchQuantities.value.length }, () => 0),
+      ]
+    } else if (batchQuantities.value.length > count) {
+      batchQuantities.value = batchQuantities.value.slice(0, count)
+    }
   },
 )
 
@@ -286,7 +307,12 @@ function openCreateDialog() {
   createForm.BatchCount = 1
   createForm.OwnerId = currentUserId.value
   batchLineSelections.value = [batchLineOptions.value[0]]
+  batchQuantities.value = []
   createDialogVisible.value = true
+  // 等工单详情加载完成后会通过 watch 自动平均分配
+  if (defaultOrder && workOrderDetail.value?.plannedQuantity) {
+    autoDistributeQuantities()
+  }
 }
 
 function splitBatchNo(orderCode, index) {
@@ -310,6 +336,8 @@ function addBatchRow() {
     ElMessage.warning('批次数量不能超过可拆数量')
     return
   }
+  batchQuantities.value.push(0)
+  batchLineSelections.value.push(batchLineOptions.value[0])
   createForm.BatchCount += 1
 }
 
@@ -319,6 +347,7 @@ function removeBatchRow(index) {
     return
   }
   batchLineSelections.value.splice(index - 1, 1)
+  batchQuantities.value.splice(index - 1, 1)
   createForm.BatchCount -= 1
 }
 
@@ -332,7 +361,15 @@ async function submitCreateBatch() {
     return
   }
   if (generatedBatchRows.value.some((item) => item.PlannedQuantity <= 0)) {
-    ElMessage.warning('批次数量超出可分配数量，请减少批次数')
+    ElMessage.warning('每个批次计划数量必须大于 0')
+    return
+  }
+  if (allocationOverLimit.value) {
+    ElMessage.warning(`已分配数量 ${allocatedTotal.value} 超过可拆数量 ${remainingQty.value}，请调整`)
+    return
+  }
+  if (allocationIncomplete.value) {
+    ElMessage.warning(`还有 ${remainingQty.value - allocatedTotal.value} 未分配完，请调整或增加批次`)
     return
   }
   if (generatedBatchRows.value.some((item) => !item.LineCode)) {
@@ -546,7 +583,17 @@ async function operate(row, action) {
           </div>
 
           <div class="preview-panel">
-            <div class="panel-title">拆分预览</div>
+            <div class="panel-title">
+              <span>拆分预览</span>
+              <el-button size="small" type="primary" plain @click="autoDistributeQuantities">平均分配</el-button>
+            </div>
+            <div class="allocation-summary" :class="{ 'is-over': allocationOverLimit, 'is-incomplete': allocationIncomplete }">
+              <span>已分配：<strong>{{ allocatedTotal }}</strong></span>
+              <span>可拆数量：<strong>{{ remainingQty }}</strong></span>
+              <span v-if="allocationOverLimit" class="allocation-warning">超出 {{ allocatedTotal - remainingQty }}，请调整</span>
+              <span v-else-if="allocationIncomplete" class="allocation-hint">未分完，剩余 {{ remainingQty - allocatedTotal }} 需分配完才能创建</span>
+              <span v-else class="allocation-ok">分配完成</span>
+            </div>
             <el-table :data="generatedBatchRows" border size="small" max-height="380">
               <el-table-column type="index" label="#" width="56" />
               <el-table-column label="批次号" min-width="210">
@@ -555,7 +602,19 @@ async function operate(row, action) {
                   <span v-else>-</span>
                 </template>
               </el-table-column>
-              <el-table-column prop="PlannedQuantity" label="计划数量" width="110" />
+              <el-table-column label="计划数量" width="140">
+                <template #default="{ row }">
+                  <el-input-number
+                    v-model="batchQuantities[row.Index - 1]"
+                    :min="0"
+                    :max="remainingQty"
+                    :precision="0"
+                    controls-position="right"
+                    size="small"
+                    style="width: 110px"
+                  />
+                </template>
+              </el-table-column>
               <el-table-column label="产线" width="170">
                 <template #default="{ row }">
                   <el-select v-model="batchLineSelections[row.Index - 1]" placeholder="选择产线">
@@ -563,7 +622,11 @@ async function operate(row, action) {
                   </el-select>
                 </template>
               </el-table-column>
-              <el-table-column label="状态" width="120">待生产</el-table-column>
+              <el-table-column label="状态" width="120">
+                <template #default>
+                  <StatusTag :meta="statusMeta(BATCH_STATUS, 1)" />
+                </template>
+              </el-table-column>
               <el-table-column label="操作" width="90">
                 <template #default="{ row }">
                   <el-button link type="danger" @click="removeBatchRow(row.Index)">删除</el-button>
@@ -577,7 +640,7 @@ async function operate(row, action) {
       <template #footer>
         <div class="dialog-actions">
           <el-button @click="createDialogVisible = false">取消</el-button>
-          <el-button type="primary" :disabled="!selectedWorkOrder || !availableWorkOrders.length || !canPlanBatch" @click="submitCreateBatch">确认创建</el-button>
+          <el-button type="primary" :disabled="!selectedWorkOrder || !availableWorkOrders.length || !canPlanBatch || allocationOverLimit || allocationIncomplete" @click="submitCreateBatch">确认创建</el-button>
         </div>
       </template>
     </el-dialog>
@@ -667,6 +730,61 @@ async function operate(row, action) {
   color: #111827;
   font-size: 16px;
   font-weight: 700;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.allocation-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 13px;
+}
+
+.allocation-summary strong {
+  color: #111827;
+  font-size: 15px;
+}
+
+.allocation-summary.is-over,
+.allocation-summary.is-incomplete {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.allocation-summary.is-over strong,
+.allocation-summary.is-incomplete strong {
+  color: #b91c1c;
+}
+
+.allocation-summary.is-incomplete {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.allocation-summary.is-incomplete strong {
+  color: #b45309;
+}
+
+.allocation-warning {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.allocation-hint {
+  color: #b45309;
+}
+
+.allocation-ok {
+  color: #15803d;
+  font-weight: 600;
 }
 
 .batch-count-control {
