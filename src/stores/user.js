@@ -19,8 +19,8 @@ const DEFAULT_USER = {
   department: '生产部',
   post: '管理层',
   position: '管理层',
-  role: 'rtm_admin',
-  roles: ['rtm_admin'],
+  role: 'RTM_ADMIN',
+  roles: ['RTM_ADMIN'],
   lines: DEFAULT_LINES,
 }
 
@@ -92,16 +92,22 @@ export const useUserStore = defineStore('user', () => {
   }
 
   function setFunctions(functions) {
-    userFunctions.value = Array.isArray(functions) ? functions : []
-    permissionCodes.value = functionListToPermissionCodes(userFunctions.value)
+    // 先把后端返回的多种结构（数组 / {list} / {records} / {rows} / {data} 等）归一为数组
+    const list = normalizeFunctionList(functions)
+    userFunctions.value = list
+    permissionCodes.value = functionListToPermissionCodes(list)
     permissionsLoaded.value = true
-    localStorage.setItem('userFunctions', JSON.stringify(userFunctions.value))
+    localStorage.setItem('userFunctions', JSON.stringify(list))
     localStorage.setItem('permissionCodes', JSON.stringify(permissionCodes.value))
   }
 
   async function fetchCurrentFunctions() {
     const result = await getCurrentUserFunctions({ pageNum: 1, pageSize: 200 })
-    setFunctions(result?.list || result || [])
+    // 联调期日志：方便定位后端返回结构与字段名是否被前端正确解析
+    console.log('[fetchCurrentFunctions] 接口原始返回:', result)
+    setFunctions(result)
+    console.log('[fetchCurrentFunctions] 归一化后功能列表:', userFunctions.value)
+    console.log('[fetchCurrentFunctions] 解析出的权限码:', permissionCodes.value)
     return permissionCodes.value
   }
 
@@ -126,11 +132,15 @@ export const useUserStore = defineStore('user', () => {
   }
 
   function hasRole(role) {
-    return userInfo.value.role === 'rtm_admin' || userInfo.value.roles?.includes(role)
+    const upper = String(role).toUpperCase()
+    return userInfo.value.role?.toUpperCase() === 'RTM_ADMIN'
+      || (userInfo.value.roles || []).some((item) => String(item).toUpperCase() === upper)
   }
 
   function hasAnyRole(roles) {
-    return userInfo.value.role === 'rtm_admin' || roles.some((role) => userInfo.value.roles?.includes(role))
+    if (userInfo.value.role?.toUpperCase() === 'RTM_ADMIN') return true
+    const userRoles = (userInfo.value.roles || []).map((item) => String(item).toUpperCase())
+    return roles.some((role) => userRoles.includes(String(role).toUpperCase()))
   }
 
   function hasPermission(permission) {
