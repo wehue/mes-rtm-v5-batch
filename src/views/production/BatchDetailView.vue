@@ -85,6 +85,7 @@ onMounted(() => {
         <el-descriptions-item label="计划数量">{{ batchDetail.baseInfo.plannedQuantity }}</el-descriptions-item>
         <el-descriptions-item label="良品数量">{{ batchDetail.baseInfo.goodQuantity }}</el-descriptions-item>
         <el-descriptions-item label="当前工序">{{ batchDetail.baseInfo.currentOperationName || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="当前工站">{{ batchDetail.baseInfo.currentStationName || batchDetail.baseInfo.stationName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="创建时间">{{ formatTime(batchDetail.baseInfo.createdAt) }}</el-descriptions-item>
         <el-descriptions-item label="状态">
           <StatusTag :meta="statusMeta(BATCH_STATUS, batchDetail.baseInfo.status)" />
@@ -94,13 +95,14 @@ onMounted(() => {
 
     <SectionCard title="批次流转记录">
       <el-timeline>
-        <el-timeline-item 
-          v-for="(item, index) in batchDetail.flowRecords" 
-          :key="index" 
+        <el-timeline-item
+          v-for="(item, index) in batchDetail.flowRecords"
+          :key="index"
           :timestamp="formatTime(item.eventTime)"
         >
           <strong>{{ getEventTypeText(item.eventType) }}</strong>
           <span v-if="item.operationName"> - {{ item.operationName }}</span>
+          <span v-if="item.stationName"> - {{ item.stationName }}</span>
           <p class="muted" v-if="item.quantity">数量: {{ item.quantity }}</p>
           <p class="muted" v-if="item.defectQuantity">不良: {{ item.defectQuantity }}</p>
         </el-timeline-item>
@@ -109,13 +111,13 @@ onMounted(() => {
 
     <SectionCard title="当前工序上料">
       <el-table :data="batchDetail.operationMaterials" border size="small">
-        <el-table-column prop="materialCode" label="元件料号" />
-        <el-table-column prop="bomPackageType" label="BOM封装类型" />
-        <el-table-column prop="materialPackageType" label="物料封装类型" />
-        <el-table-column prop="brand" label="品牌" />
-        <el-table-column prop="bomQuantity" label="单板用量" />
-        <el-table-column prop="actualQuantity" label="已上数量" />
-        <el-table-column label="状态">
+        <el-table-column prop="materialCode" label="元件料号" align="center"/>
+        <el-table-column prop="bomPackageType" label="BOM封装类型" align="center"/>
+        <el-table-column prop="materialPackageType" label="物料封装类型" align="center"/>
+        <el-table-column prop="brand" label="品牌" align="center"/>
+        <el-table-column prop="bomQuantity" label="单板用量" align="center"/>
+        <el-table-column prop="actualQuantity" label="已上数量" align="center"/>
+        <el-table-column label="状态" align="center">
           <template #default="{ row }">
             <el-tag :type="verifyStatusType(row.verifyStatus)">{{ verifyStatusText(row.verifyStatus) }}</el-tag>
           </template>

@@ -29,6 +29,7 @@ const dialogVisible = ref(false)
 const submitting = ref(false)
 const listLoading = ref(false)
 const optionLoading = ref(false)
+const exportLoading = ref(false)
 const operatingOrderId = ref(null)
 const operatingAction = ref('')
 const filters = reactive({ workOrderCode: '', productId: '', status: '' })
@@ -48,7 +49,7 @@ const statusStats = reactive({
   totalCount: 0,
 })
 
-const canManage = computed(() => userStore.hasAnyRole(['production_supervisor']))
+const canManage = computed(() => userStore.hasAnyRole(['PRODUCTION_SUPERVISOR']))
 const selectedProduct = computed(() => productOptions.value.find((product) => product.Id === Number(form.ProductId)))
 const availableRoutes = computed(() => {
   if (!selectedProduct.value) return []
@@ -289,6 +290,68 @@ function handleSizeChange(pageSize) {
   pagination.pageNum = 1
   loadWorkOrders()
 }
+
+async function handleExport() {
+  if (exportLoading.value) return
+  exportLoading.value = true
+  try {
+    const result = await getWorkOrderList({
+      workOrderCode: filters.workOrderCode || undefined,
+      productId: filters.productId || undefined,
+      status: filters.status || undefined,
+      pageNum: 1,
+      pageSize: 10000,
+    })
+    const allRows = (result.list || []).map(normalizeWorkOrder)
+    if (!allRows.length) {
+      ElMessage.warning('当前筛选条件下无数据可导出')
+      return
+    }
+
+    const headers = [
+      '工单号', '产品名称', '产品类型', '计划数量', '交货期', '工艺路线', '状态', '创建人', '创建时间', '更新人', '更新时间'
+    ]
+    const fields = [
+      'WorkOrderCode', 'ProductName', 'ProductTypeName', 'PlannedQuantity', 'DueDate', 'RouteName',
+      (row) => WORK_ORDER_STATUS[row.Status]?.label || '-',
+      'CreatedBy', 'CreatedAt', 'UpdatedBy', 'UpdatedAt',
+    ]
+
+    const escapeCell = (val, isTime = false) => {
+      if (val === null || val === undefined) return '""'
+      const str = String(val).replace(/"/g, '""')
+      return isTime ? `"\t${str}"` : `"${str}"`
+    }
+    const timeFields = new Set(['DueDate', 'CreatedAt', 'UpdatedAt'])
+    const headerLine = headers.map((h) => `"${h}"`).join(',')
+    const dataLines = allRows.map((row) =>
+      fields.map((field) => {
+        const key = typeof field === 'function' ? '' : field
+        const value = typeof field === 'function' ? field(row) : row[field]
+        return escapeCell(value ?? '-', timeFields.has(key))
+      }).join(',')
+    )
+    const csvContent = '\uFEFF' + [headerLine, ...dataLines].join('\r\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    const timestamp = new Date().toISOString().slice(0, 10)
+    link.href = url
+    link.download = `工单导出_${timestamp}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
+    ElMessage.success(`已导出 ${allRows.length} 条工单数据`)
+  } catch (error) {
+    console.error('导出工单失败:', error)
+    ElMessage.error('导出失败，请稍后重试')
+  } finally {
+    exportLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -298,7 +361,7 @@ function handleSizeChange(pageSize) {
         <h1 class="page-title">工单管理</h1>
       </div>
       <div class="table-actions">
-        <el-button @click="ElMessage.success('已导出当前筛选工单数据')">导出 Excel</el-button>
+        <el-button :loading="exportLoading" @click="handleExport">导出 Excel</el-button>
         <el-button type="primary" :disabled="!canManage" @click="openCreateDialog">新建工单</el-button>
       </div>
     </div>
@@ -333,23 +396,23 @@ function handleSizeChange(pageSize) {
 
     <el-card shadow="never">
       <el-table v-loading="listLoading" :data="workOrderRows" border>
-        <el-table-column prop="WorkOrderCode" label="工单号" width="230">
+        <el-table-column prop="WorkOrderCode" label="工单号" width="200" align="center">
           <template #default="{ row }">
             <el-link type="primary" @click="router.push(`/production/work-order/${row.Id}`)">{{ row.WorkOrderCode }}</el-link>
           </template>
         </el-table-column>
-        <el-table-column prop="ProductName" label="产品名称" width="190" />
-        <el-table-column prop="ProductTypeName" label="产品类型" width="170" />
-        <el-table-column prop="PlannedQuantity" label="计划数量" width="150" />
-        <el-table-column prop="DueDate" label="交货期" width="180" />
-        <el-table-column prop="RouteName" label="工艺路线" width="230" />
-        <el-table-column label="状态" width="140">
+        <el-table-column prop="ProductName" label="产品名称" width="190" align="center"/>
+        <el-table-column prop="ProductTypeName" label="产品类型" width="170" align="center"/>
+        <el-table-column prop="PlannedQuantity" label="计划数量" width="150" align="center"/>
+        <el-table-column prop="DueDate" label="交货期" width="180" align="center"/>
+        <el-table-column prop="RouteName" label="工艺路线" width="230" align="center"/>
+        <el-table-column label="状态" width="140" align="center">
           <template #default="{ row }">
             <StatusTag :meta="statusMeta(WORK_ORDER_STATUS, row.Status)" />
           </template>
         </el-table-column>
-        <el-table-column prop="CreatedBy" label="创建人" width="150" />
-        <el-table-column prop="CreatedAt" label="创建时间" width="210" />
+        <el-table-column prop="CreatedBy" label="创建人" width="150" align="center"/>
+        <el-table-column prop="CreatedAt" label="创建时间" width="210" align="center"/>
         <el-table-column fixed="right" label="操作" width="310">
           <template #default="{ row }">
             <div class="row-actions">

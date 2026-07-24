@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   Bell,
@@ -15,9 +15,9 @@ import {
   TrendCharts,
   User,
 } from '@element-plus/icons-vue'
-import { useUserStore } from '../stores/user'
-import { messages } from '../utils/mockData'
-import { PERMISSION_CODES, ROLES } from '../utils/constants'
+import { useUserStore } from '@/stores/user'
+import { messages } from '@/utils/mockData'
+import { PERMISSION_CODES, ROLES } from '@/utils/constants'
 
 const router = useRouter()
 const route = useRoute()
@@ -25,29 +25,21 @@ const userStore = useUserStore()
 const isCollapsed = ref(false)
 
 const roleLabel = computed(() => {
-  const role = ROLES.find((item) => item.value === userStore.userInfo?.role)
+  const role = ROLES.find((item) => item.value === userStore.userInfo.role)
   return role?.label || '工厂管理层'
 })
 
-const displayName = computed(() => userStore.userInfo?.name || '系统管理员')
-const activeMenu = computed(() => route.meta?.activeMenu || (
-  route.path.startsWith('/production/work-order/')
-    ? '/production/work-order'
-    : route.path
-))
+const displayName = computed(() => userStore.userInfo.name || '系统管理员')
+const activeMenu = computed(() => route.meta?.activeMenu || route.path)
 const unreadCount = computed(() => messages.filter((item) => item.unread).length)
+const canViewKanban = computed(() => userStore.hasPermission(PERMISSION_CODES.KANBAN))
 const breadcrumbItems = computed(() => {
   const moduleTitle = route.meta?.module || '首页'
   const title = route.meta?.title || '生产驾驶舱'
-  const parent = route.meta?.parent || (
-    route.path.startsWith('/production/work-order/')
-      ? { title: '工单管理', path: '/production/work-order' }
-      : null
-  )
   const items = [{ title: moduleTitle }]
 
-  if (parent) {
-    items.push(parent)
+  if (route.meta?.parent) {
+    items.push(route.meta.parent)
   }
   if (title !== moduleTitle || items.length > 1) {
     items.push({ title })
@@ -104,7 +96,7 @@ const menuItems = computed(() => allMenuItems
 
 function handleCommand(command) {
   if (command === 'profile') router.push('/system/profile')
-  if (command === 'message') router.push('/system/profile')
+  if (command === 'message') router.push('/system/message')
   if (command === 'logout') {
     userStore.logout()
     router.push('/login')
@@ -171,7 +163,7 @@ function handleCommand(command) {
             <span>实时连接正常</span>
             <strong>30s 自动刷新</strong>
           </div>
-          <el-button class="kanban-entry" :icon="TrendCharts" @click="router.push('/kanban/line-status')">
+          <el-button v-if="canViewKanban" class="kanban-entry" :icon="TrendCharts" @click="router.push('/kanban/line-status')">
             大屏
           </el-button>
           <el-badge :value="unreadCount" :hidden="unreadCount === 0">
@@ -201,7 +193,7 @@ function handleCommand(command) {
   </el-container>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .app-layout {
   height: 100vh;
   overflow: hidden;
@@ -211,70 +203,70 @@ function handleCommand(command) {
   background: var(--rtm-steel-dark);
   transition: width 0.2s ease;
   overflow: hidden;
-}
 
-.logo-area {
-  height: 66px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 16px;
-  border-bottom: 1px solid rgba(216, 222, 230, 0.14);
-  color: #fff;
-}
+  .logo-area {
+    height: 66px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 16px;
+    border-bottom: 1px solid rgba(216, 222, 230, 0.14);
+    color: #fff;
+  }
 
-.logo-mark {
-  width: 36px;
-  height: 36px;
-  display: grid;
-  flex: 0 0 auto;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 6px;
-  background: #1f5f99;
-  font-weight: 800;
-}
+  .logo-mark {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 6px;
+    background: #1f5f99;
+    font-weight: 800;
+  }
 
-.logo-area h1 {
-  font-size: 17px;
-  line-height: 1.2;
-}
+  h1 {
+    font-size: 17px;
+    line-height: 1.2;
+  }
 
-.logo-area p {
-  margin-top: 3px;
-  color: #9cadbf;
-  font-size: 12px;
-}
+  p {
+    margin-top: 3px;
+    color: #9cadbf;
+    font-size: 12px;
+  }
 
-.app-aside .el-menu {
-  border-right: none;
-}
+  .el-menu {
+    border-right: none;
+  }
 
-.app-aside :deep(.el-menu-item),
-.app-aside :deep(.el-sub-menu__title) {
-  height: 44px;
-  margin: 2px 8px;
-  border-radius: 5px;
-}
+  :deep(.el-menu-item),
+  :deep(.el-sub-menu__title) {
+    height: 44px;
+    margin: 2px 8px;
+    border-radius: 5px;
+  }
 
-.app-aside :deep(.el-menu-item.is-active) {
-  position: relative;
-  background: rgba(31, 95, 153, 0.88);
-}
+  :deep(.el-menu-item.is-active) {
+    position: relative;
+    background: rgba(31, 95, 153, 0.88);
 
-.app-aside :deep(.el-menu-item.is-active)::before {
-  position: absolute;
-  top: 8px;
-  bottom: 8px;
-  left: 0;
-  width: 3px;
-  background: #9cc8ee;
-  content: '';
-}
+    &::before {
+      position: absolute;
+      top: 8px;
+      bottom: 8px;
+      left: 0;
+      width: 3px;
+      background: #9cc8ee;
+      content: '';
+    }
+  }
 
-.app-aside :deep(.el-menu-item:hover),
-.app-aside :deep(.el-sub-menu__title:hover) {
-  background: rgba(255, 255, 255, 0.08);
+  :deep(.el-menu-item:hover),
+  :deep(.el-sub-menu__title:hover) {
+    background: rgba(255, 255, 255, 0.08);
+  }
 }
 
 .main-container {
@@ -307,10 +299,10 @@ function handleCommand(command) {
   background: transparent;
   color: var(--rtm-text);
   cursor: pointer;
-}
 
-.user-info small {
-  color: var(--rtm-text-soft);
+  small {
+    color: var(--rtm-text-soft);
+  }
 }
 
 .app-main {
@@ -334,10 +326,10 @@ function handleCommand(command) {
   background: #f8fafc;
   color: var(--rtm-text-soft);
   font-size: 12px;
-}
 
-.system-status strong {
-  color: var(--rtm-primary-dark);
+  strong {
+    color: var(--rtm-primary-dark);
+  }
 }
 
 .status-light {
@@ -360,6 +352,7 @@ function handleCommand(command) {
     display: none;
   }
 
+  .header-right .el-tag,
   .header-right > .el-button {
     display: none;
   }

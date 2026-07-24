@@ -7,21 +7,8 @@ import StatusTag from '@/components/StatusTag.vue'
 import { BATCH_STATUS, statusMeta } from '@/utils/constants'
 import {
   BATCH_STATUS_CODE,
-  WORK_ORDER_STATUS_CODE,
-  batchLockState,
-  batches,
-  getBatchDefectQuantity,
-  getBatchLine,
-  getBatchLockInfo,
-  getBatchProduct,
-  getBatchRouteProgress,
-  getCurrentOperationName,
   findUser,
   getWorkOrderRoute,
-  getUserDisplayName,
-  getUserOptionLabel,
-  lines,
-  users,
 } from '@/utils/mockData'
 import { useUserStore } from '@/stores/user'
 import { getBatchList, getBatchStatusStats, updateBatchStatus, createBatch } from '@/api/batch'
@@ -31,7 +18,6 @@ import { getReleasedWorkOrders, getReleasedWorkOrderDetail } from '@/api/workOrd
 const router = useRouter()
 const userStore = useUserStore()
 const filters = reactive({ keyword: '', WorkOrderCode: '', ProductName: '', Status: '', LineCode: '' })
-const query = reactive({ keyword: '', WorkOrderCode: '', ProductName: '', Status: '', LineCode: '' })
 const createDialogVisible = ref(false)
 const createForm = reactive({
   WorkOrderId: '',
@@ -55,13 +41,11 @@ const listLoading = ref(false)
 const pagination = reactive({ pageNum: 1, pageSize: 5, total: 0 })
 const workOrderDetail = ref({})
 
-const canPlanBatch = computed(() => userStore.hasAnyRole(['production_supervisor']))
-const canCoordinateBatch = computed(() => userStore.hasAnyRole(['production_supervisor', 'leader']))
-const canQualityLock = computed(() => userStore.hasAnyRole(['quality_engineer', 'production_supervisor']))
+const canPlanBatch = computed(() => userStore.hasAnyRole(['PRODUCTION_SUPERVISOR']))
+const canCoordinateBatch = computed(() => userStore.hasAnyRole(['PRODUCTION_SUPERVISOR', 'LEADER']))
+const canQualityLock = computed(() => userStore.hasAnyRole(['QUALITY_ENGINEER', 'PRODUCTION_SUPERVISOR']))
 const currentUserId = computed(() => findUser(userStore.userInfo.username || userStore.userInfo.name)?.Id || 3)
-const batchStatusCodes = Object.keys(BATCH_STATUS)
-  .map(Number)
-  .filter(Number.isFinite)
+const batchStatusCodes = Object.keys(BATCH_STATUS).map(Number)
 
 async function loadStatusStats() {
   try {
@@ -121,6 +105,21 @@ async function loadWorkOrderDetail(workOrderId) {
   }
 }
 
+function formatDateTime(value) {
+  if (!value) return '-'
+  const normalized = typeof value === 'string' ? value.replace('T', ' ') : value
+  const date = new Date(normalized)
+  if (Number.isNaN(date.getTime())) {
+    return String(value).replace('T', ' ').slice(0, 16)
+  }
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day} ${hours}:${minutes}`
+}
+
 function normalizeBatch(batch) {
   return {
     ...batch,
@@ -134,9 +133,10 @@ function normalizeBatch(batch) {
     FinishedQuantity: batch.finishedQuantity,
     DefectQuantity: batch.defectQuantity,
     CurrentOperationName: batch.currentOperationName,
-    EstimatedCompletionTime: batch.estimatedCompletionTime,
-    StartTime: batch.startTime,
-    EndTime: batch.endTime,
+    CurrentStationName: batch.currentStationName || batch.stationName || '',
+    EstimatedCompletionTime: formatDateTime(batch.estimatedCompletionTime),
+    StartTime: formatDateTime(batch.startTime),
+    EndTime: formatDateTime(batch.endTime),
     Status: batch.status,
   }
 }
@@ -245,18 +245,6 @@ watch(
   },
 )
 
-const filteredBatches = computed(() => batches.filter((item) => {
-  const order = workOrders.find((workOrder) => workOrder.Id === item.WorkOrderId)
-  const product = getBatchProduct(item)
-  const line = getBatchLine(item)
-  const keyword = !query.keyword || item.LotCode.includes(query.keyword)
-  const workOrder = !query.WorkOrderCode || order?.WorkOrderCode.includes(query.WorkOrderCode)
-  const productMatched = !query.ProductName || product?.ProductName.includes(query.ProductName)
-  const status = !query.Status || item.Status === Number(query.Status)
-  const lineMatched = !query.LineCode || line?.LineCode === query.LineCode
-  return keyword && workOrder && productMatched && status && lineMatched
-}))
-
 const statusCards = computed(() => {
   const statusMapping = {
     1: { key: 1, ...BATCH_STATUS[1], count: statusStats.value.pendingCount },
@@ -266,9 +254,7 @@ const statusCards = computed(() => {
     5: { key: 5, ...BATCH_STATUS[5], count: statusStats.value.lockedCount },
     6: { key: 6, ...BATCH_STATUS[6], count: statusStats.value.completedCount },
   }
-  return batchStatusCodes
-    .map((code) => statusMapping[code])
-    .filter(Boolean)
+  return batchStatusCodes.map((code) => statusMapping[code])
 })
 
 function rowClass({ row }) {
@@ -497,20 +483,26 @@ async function operate(row, action) {
 
     <el-card shadow="never">
       <el-table v-loading="listLoading" :data="batchRows" border :row-class-name="rowClass">
-        <el-table-column prop="LotCode" label="批次号" width="170px">
+        <el-table-column prop="LotCode" label="批次号" width="170px" align="center">
           <template #default="{ row }"><el-link type="primary" @click="router.push(batchDetailPath(row.Id))">{{ row.LotCode }}</el-link></template>
         </el-table-column>
-        <el-table-column prop="WorkOrderCode" label="所属工单" width="190" />
-        <el-table-column prop="ProductName" label="产品名称" width="190" />
-        <el-table-column prop="ProductTypeName" label="产品类型" width="170" />
-        <el-table-column prop="LineName" label="分配产线" width="150" />
-        <el-table-column prop="PlannedQuantity" label="计划数量" width="150" />
-        <el-table-column prop="FinishedQuantity" label="已完工" width="130" />
-        <el-table-column prop="DefectQuantity" label="不良" width="110" />
-        <el-table-column prop="CurrentOperationName" label="当前工序" width="150" />
-        <el-table-column prop="EstimatedCompletionTime" label="预计完成时间" width="210" />
-        <el-table-column prop="StartTime" label="上线时间" width="210" />
-        <el-table-column label="状态" width="140">
+        <el-table-column prop="WorkOrderCode" label="所属工单" width="190" align="center"/>
+        <el-table-column prop="ProductName" label="产品名称" width="190" align="center"/>
+        <el-table-column prop="ProductTypeName" label="产品类型" width="170" align="center"/>
+        <el-table-column prop="LineName" label="分配产线" width="150" align="center"/>
+        <el-table-column prop="PlannedQuantity" label="计划数量" width="150" align="center"/>
+        <el-table-column prop="FinishedQuantity" label="已完工数量" width="130" align="center"/>
+        <el-table-column prop="DefectQuantity" label="不良数量" width="110" align="center"/>
+        <el-table-column prop="CurrentOperationName" label="当前工序" width="150" align="center"/>
+        <el-table-column prop="CurrentStationName" label="当前工站" width="160" align="center">
+          <template #default="{ row }">
+            <span v-if="row.CurrentStationName">{{ row.CurrentStationName }}</span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="EstimatedCompletionTime" label="预计完成时间" width="210" align="center"/>
+        <el-table-column prop="StartTime" label="上线时间" width="210" align="center"/>
+        <el-table-column label="状态" width="140" align="center">
           <template #default="{ row }"><StatusTag :meta="statusMeta(BATCH_STATUS, row.Status)" /></template>
         </el-table-column>
 
